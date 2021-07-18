@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+	<modification
+	xmlns="https://github.com/vqmod/vqmod"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="https://github.com/vqmod/vqmod https://raw.githubusercontent.com/vqmod/vqmod/master/vqmod.xsd"
+	>
+	<id><![CDATA[[[VQMOD] Link Customer, Color Order Status and Display Payment Method in Admin > Sales > Orders]]></id>
+	<version>1.0</version>
+	<vqmver>2.6.6</vqmver>
+	<author>kanenas.net (aka Nikolas Branis) - nbran@kanenas.net</author>
+	<file name="admin/model/sale/order.php" error="log">
+		<operation error="log">
+			<search position="replace">
+				<![CDATA[$sql = "SELECT o.order_id, CONCAT(o.firstname, ' ', o.lastname) AS customer, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS order_status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.date_added, o.date_modified FROM `" . DB_PREFIX . "order` o";
+				]]>
+			</search>
+			<add><![CDATA[		$sql = "SELECT o.order_id, o.order_status_id, CONCAT(o.firstname, ' ', o.lastname) AS customer, o.customer_id, (SELECT os.name FROM " . DB_PREFIX . "order_status os WHERE os.order_status_id = o.order_status_id AND os.language_id = '" . (int)$this->config->get('config_language_id') . "') AS order_status, o.shipping_code, o.total, o.currency_code, o.currency_value, o.payment_method, o.date_added, o.date_modified FROM `" . DB_PREFIX . "order` o";]]></add>
+		</operation>
+	</file>
+	<file name="admin/controller/sale/order.php" error="log">
+		<operation error="log">
+			<search position="before" index="1"><![CDATA[$data['orders'][] = array(]]></search>
+			<add><![CDATA[
+		if (intval($result['customer_id'] == '0')) {
+			$customer_url = '';
+		} else {
+			$customer_url = $this->url->link('customer/customer/edit', 'token=' . $this->session->data['token'] . '&customer_id='. intval($result['customer_id']) . $url, true);
+		}
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="before"><![CDATA['customer'      => $result['customer'],]]></search>
+			<add><![CDATA[
+			'customer_id'      => $result['customer_id'],
+			'customer_href'    => $customer_url,
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="after"><![CDATA['order_status'  => $result['order_status'] ? $result['order_status'] : $this->language->get('text_missing'),]]></search>
+			<add><![CDATA[				'order_status_id'        => $result['order_status_id'],]]></add>
+		</operation>
+		<operation error="log">
+			<search position="after"><![CDATA['total'         => $this->currency->format($result['total'], $result['currency_code'], $result['currency_value']),]]></search>
+			<add><![CDATA[
+				'payment_method'        => $result['payment_method'],
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="after" index="1"><![CDATA[$data['column_total'] = $this->language->get('column_total');]]></search>
+			<add><![CDATA[
+		$data['payment_method'] = $this->language->get('text_payment_method');
+			]]></add>
+		</operation>
+	</file>
+	<file name="admin/view/template/sale/order_list.tpl" error="log">
+		<operation error="log">
+			<search position="replace"><![CDATA[<td class="text-left"><?php echo $order['customer']; ?></td>]]></search>
+			<add><![CDATA[
+            <td class="text-left">
+              <?php if ($order['customer_href'] == '') { ?>
+                <?php echo $order['customer']; ?>
+              <?php } else { ?>
+                <a href="<?php echo $order['customer_href']; ?>" title="<?php echo $order['customer']; ?>"><?php echo $order['customer']; ?></a>
+              <?php } ?>
+            </td>
+				]]></add>
+		</operation>
+		<operation error="log">
+			<search position="replace"><![CDATA[<td class="text-left"><?php echo $order['order_status']; ?></td>]]></search>
+			<add><![CDATA[
+			<?php
+			switch (intval($order['order_status_id'])) {
+				case 0:
+					$status_color = '#dedede'; //Missing Orders
+					break;
+				case 7:
+					$status_color = '#ff0000'; //Canceled
+					break;
+				case 9:
+					$status_color = '#ff8080'; //Canceled Reversal
+					break;
+				case 13:
+					$status_color = '#bc8b8b'; //Chargeback
+					break;
+				case 5:
+					$status_color = '#256125'; //Complete
+					break;
+				case 8:
+					$status_color = '#b30000'; //Denied
+					break;
+				case 14:
+					$status_color = '#660000'; //Expired
+					break;
+				case 10:
+					$status_color = '#000000'; //Failed
+					break;
+				case 1:
+					$status_color = '#dedede'; //Pending
+					break;
+				case 15:
+					$status_color = '#ffccff'; //Processed
+					break;
+				case 2:
+					$status_color = '#ff0096'; //Processing
+					break;
+				case 11:
+					$status_color = '#ff6600'; //Refunded
+					break;
+				case 12:
+					$status_color = '#ff6c00'; //Reversed
+					break;
+				case 3:
+					$status_color = '#80b580'; //Shipped
+					break;
+				case 16:
+					$status_color = '#803300'; //Voided
+					break;
+				default:
+					$status_color = '#dedede';
+					break;
+			}
+			?>
+            <td class="text-left" style="background-color: <?php echo $status_color; ?>; color: #000000; font-weight: bold;"><?php echo $order['order_status']; ?></td>
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="before"><![CDATA[<td class="text-left"><?php if ($sort == 'o.date_added') { ?>]]></search>
+			<add><![CDATA[
+              <td class="text-left"><?php echo rtrim($payment_method,':'); ?></td>
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="after"><![CDATA[<td class="text-right"><?php echo $order['total']; ?></td>]]></search>
+			<add><![CDATA[
+              <td class="left"><?php echo $order['payment_method']; ?></td>
+			]]></add>
+		</operation>
+		<operation error="log">
+			<search position="replace"><![CDATA[<td class="text-center" colspan="8"><?php echo $text_no_results; ?></td>]]></search>
+			<add><![CDATA[
+            <td class="center" colspan="11"><?php echo $text_no_results; ?></td>
+			]]></add>
+		</operation>
+	</file>
+	</modification>
